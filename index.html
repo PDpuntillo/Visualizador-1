@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GGAL — Opciones AB</title>
+  <style>
+    /* ── Reset & base ───────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding-bottom: 44px;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #58a6ff;
+      letter-spacing: .4px;
+    }
+    header p {
+      font-size: .72rem;
+      color: #8b949e;
+      margin-top: 3px;
+    }
+    .refresh-btn {
+      background: none;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #8b949e;
+      padding: 5px 14px;
+      font-size: .78rem;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .refresh-btn:hover { background: #21262d; color: #e6edf3; }
+    .refresh-btn:disabled { opacity: .4; cursor: default; }
+
+    /* ── Price cards ────────────────────────────────────── */
+    .cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      padding: 18px 24px 6px;
+    }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 14px 22px;
+      min-width: 170px;
+    }
+    .card .label {
+      font-size: .68rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .card .price {
+      font-size: 1.7rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-family: monospace;
+    }
+    .card .change {
+      font-size: .82rem;
+      margin-top: 4px;
+      font-family: monospace;
+    }
+    .card .bid-ask {
+      font-size: .72rem;
+      color: #8b949e;
+      margin-top: 6px;
+      font-family: monospace;
+    }
+    .card .bid-ask span.b { color: #3fb950; }
+    .card .bid-ask span.a { color: #f85149; }
+
+    /* ── Color classes ──────────────────────────────────── */
+    .up   { color: #3fb950; }
+    .down { color: #f85149; }
+    .flat { color: #8b949e; }
+
+    /* ── Section title ──────────────────────────────────── */
+    .section-title {
+      font-size: .7rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 16px 24px 10px;
+    }
+
+    /* ── Table wrapper ──────────────────────────────────── */
+    .table-wrapper {
+      padding: 0 24px;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .83rem;
+    }
+    thead tr {
+      background: #161b22;
+      border-bottom: 2px solid #30363d;
+    }
+    th {
+      padding: 9px 12px;
+      text-align: right;
+      color: #8b949e;
+      font-weight: 600;
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      white-space: nowrap;
+    }
+    th:first-child, th.left { text-align: left; }
+
+    tbody tr {
+      border-bottom: 1px solid #21262d;
+      transition: background .1s;
+    }
+    tbody tr:hover { background: #1c2128; }
+
+    /* ITM highlight */
+    tbody tr.itm { background: rgba(63, 185, 80, .04); }
+    tbody tr.itm:hover { background: rgba(63, 185, 80, .09); }
+
+    td {
+      padding: 8px 12px;
+      text-align: right;
+      font-family: monospace;
+      white-space: nowrap;
+    }
+    td:first-child { text-align: left; }
+
+    td.sym   { font-weight: 600; color: #58a6ff; font-family: 'Segoe UI', sans-serif; }
+    td.strike{ font-weight: 700; color: #e6edf3; }
+    td.bid-c { color: #3fb950; }
+    td.ask-c { color: #f85149; }
+    td.vi    { color: #d2a8ff; }
+    td.ve    { color: #ffa657; }
+    td.muted { color: #8b949e; font-size: .78rem; }
+
+    .chip {
+      display: inline-block;
+      background: #21262d;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: .72rem;
+      color: #8b949e;
+    }
+
+    /* ITM / OTM badge */
+    .badge {
+      display: inline-block;
+      font-size: .6rem;
+      font-weight: 700;
+      letter-spacing: .5px;
+      border-radius: 3px;
+      padding: 1px 5px;
+      margin-left: 5px;
+      font-family: sans-serif;
+      vertical-align: middle;
+    }
+    .badge.itm { background: rgba(63,185,80,.2); color: #3fb950; }
+    .badge.otm { background: rgba(248,81,73,.15); color: #f85149; }
+    .badge.atm { background: rgba(210,168,255,.15); color: #d2a8ff; }
+
+    /* ── Status bar ─────────────────────────────────────── */
+    .status-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #161b22;
+      border-top: 1px solid #30363d;
+      padding: 6px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: .71rem;
+      color: #8b949e;
+    }
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 7px;
+      background: #8b949e;
+    }
+    .dot.ok      { background: #3fb950; animation: pulse 2s infinite; }
+    .dot.loading { background: #d29922; }
+    .dot.error   { background: #f85149; }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: .35; }
+    }
+
+    /* ── Misc ───────────────────────────────────────────── */
+    .placeholder {
+      text-align: center;
+      padding: 60px 24px;
+      color: #8b949e;
+      font-size: .9rem;
+    }
+    .error-box {
+      margin: 20px 0;
+      padding: 16px;
+      background: #2d1117;
+      border: 1px solid #f85149;
+      border-radius: 8px;
+      color: #f85149;
+      font-size: .85rem;
+      line-height: 1.6;
+    }
+    .countdown { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════════ -->
+<header>
+  <div>
+    <h1>📈 GGAL — Opciones Abril</h1>
+    <p id="last-update">Cargando datos…</p>
+  </div>
+  <button class="refresh-btn" id="refresh-btn" onclick="fetchData()">↻ Actualizar</button>
+</header>
+
+<!-- ══ PRICE CARDS ═════════════════════════════════════════ -->
+<div class="cards">
+  <div class="card">
+    <div class="label">GGAL 48hs</div>
+    <div class="price flat" id="ggal-price">—</div>
+    <div class="change flat" id="ggal-chg">—</div>
+    <div class="bid-ask" id="ggal-ba">—</div>
+  </div>
+  <div class="card">
+    <div class="label">GGAL CI</div>
+    <div class="price flat" id="ggalci-price">—</div>
+    <div class="change flat" id="ggalci-chg">—</div>
+    <div class="bid-ask" id="ggalci-ba">—</div>
+  </div>
+</div>
+
+<!-- ══ OPTIONS TABLE ═══════════════════════════════════════ -->
+<div class="section-title">Calls — Vencimiento Abril (AB)</div>
+<div class="table-wrapper">
+  <div id="table-container">
+    <div class="placeholder">⏳ Cargando cotizaciones…</div>
+  </div>
+</div>
+
+<!-- ══ STATUS BAR ══════════════════════════════════════════ -->
+<div class="status-bar">
+  <div>
+    <span class="dot" id="dot"></span>
+    <span id="status-msg">Conectando…</span>
+  </div>
+  <div>
+    Próxima actualización: <span class="countdown" id="countdown">60</span>s &nbsp;|&nbsp;
+    Fuente: EPGB · Google Sheets
+  </div>
+</div>
+
+<!-- ══ SCRIPT ══════════════════════════════════════════════ -->
+<script>
+  // ── Config ─────────────────────────────────────────────
+  const SHEET_ID  = '12wVjK5f4jqbjzZIo4DQQ7PNd2_4_NgxNVZ_fUZoDqBg';
+  const GID_AB    = '863748030';
+  const REFRESH_S = 60;
+
+  // ── Índices de columna fijos (el gviz no exporta los headers correctamente)
+  // Orden real del CSV: symbol, bidsize, bid, bidVI, askVI, ask, asksize, last, chg%, strike, lastVI, lastVE, open, high, low, ...
+  const C = {
+    symbol:  0,
+    bidsize: 1,
+    bid:     2,
+    bidVI:   3,
+    askVI:   4,
+    ask:     5,
+    asksize: 6,
+    last:    7,
+    chg:     8,
+    strike:  9,
+    lastVI:  10,
+    lastVE:  11,
+    open:    12,
+    high:    13,
+  };
+
+  let cdVal = REFRESH_S;
+  let cdTimer;
+  let ggalLast = null;
+
+  // ── Helpers ─────────────────────────────────────────────
+  // Limpia comillas y parsea números en formato argentino (1.234,56)
+  function clean(raw) {
+    return String(raw ?? '').replace(/"/g, '').trim();
+  }
+
+  function parseNum(raw) {
+    const s = clean(raw).replace(/\./g, '').replace(',', '.').replace('%', '');
+    return parseFloat(s);
+  }
+
+  function fmt(raw, dec = 2) {
+    const n = parseNum(raw);
+    if (isNaN(n)) return '—';
+    return n.toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  }
+
+  function fmtPct(raw) {
+    const n = parseNum(raw);
+    if (isNaN(n)) return '—';
+    return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+  }
+
+  function colorClass(raw) {
+    const n = parseNum(raw);
+    if (isNaN(n) || n === 0) return 'flat';
+    return n > 0 ? 'up' : 'down';
+  }
+
+  function setStatus(type, msg) {
+    document.getElementById('dot').className = `dot ${type}`;
+    document.getElementById('status-msg').textContent = msg;
+  }
+
+  // Obtiene el valor de una celda por índice de columna
+  function gc(row, colIdx) {
+    return clean(row[colIdx] ?? '');
+  }
+
+  // ── CSV parser (maneja campos entrecomillados) ──────────
+  function parseCSV(text) {
+    const rows = [];
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      const cols = [];
+      let cur = '', inQ = false;
+      for (const ch of line) {
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { cols.push(cur); cur = ''; }
+        else cur += ch;
+      }
+      cols.push(cur);
+      rows.push(cols);
+    }
+    return rows;
+  }
+
+  // ── Fetch & render principal ────────────────────────────
+  async function fetchData() {
+    document.getElementById('refresh-btn').disabled = true;
+    setStatus('loading', 'Actualizando…');
+
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID_AB}`;
+      const res  = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const csv  = await res.text();
+      renderAll(parseCSV(csv));
+      resetCountdown();
+      setStatus('ok', 'Datos actualizados correctamente');
+    } catch (e) {
+      setStatus('error', `Error al cargar datos`);
+      document.getElementById('table-container').innerHTML = `
+        <div class="error-box">
+          ⚠️ <strong>No se pudieron cargar los datos.</strong><br><br>
+          Verificá que la planilla esté compartida como <em>"Cualquiera con el enlace puede ver"</em>.<br>
+          <small style="opacity:.7;display:block;margin-top:8px">${e.message}</small>
+        </div>`;
+    } finally {
+      document.getElementById('refresh-btn').disabled = false;
+    }
+  }
+
+  // ── Render ──────────────────────────────────────────────
+  function renderAll(rows) {
+    let lastUpdate = '';
+    let dataRows   = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const r   = rows[i];
+      const sym = clean(r[C.symbol]);
+
+      // Fila de timestamp
+      if (/ltima/i.test(sym)) {
+        for (let j = 1; j < r.length; j++) {
+          if (clean(r[j])) { lastUpdate = clean(r[j]); break; }
+        }
+        continue;
+      }
+      // Saltear fila de headers y filas vacías
+      if (!sym || sym === 'symbol') continue;
+
+      dataRows.push(r);
+    }
+
+    document.getElementById('last-update').textContent =
+      lastUpdate ? `Última actualización: ${lastUpdate}` : '';
+
+    // ── Cards del subyacente ──────────────────────────────
+    const ggal   = dataRows.find(r => clean(r[C.symbol]) === 'GGAL');
+    const ggalCI = dataRows.find(r => clean(r[C.symbol]) === 'GGAL - CI');
+
+    if (ggal) {
+      const last = gc(ggal, C.last);
+      ggalLast   = parseNum(last);
+      const chg  = gc(ggal, C.chg);
+      const cc   = colorClass(chg);
+      document.getElementById('ggal-price').textContent = fmt(last, 0);
+      document.getElementById('ggal-price').className   = `price ${cc}`;
+      document.getElementById('ggal-chg').textContent   = fmtPct(chg);
+      document.getElementById('ggal-chg').className     = `change ${cc}`;
+      document.getElementById('ggal-ba').innerHTML =
+        `<span class="b">B ${fmt(gc(ggal, C.bid), 0)}</span>&nbsp;/&nbsp;<span class="a">A ${fmt(gc(ggal, C.ask), 0)}</span>`;
+    }
+    if (ggalCI) {
+      const last = gc(ggalCI, C.last);
+      const chg  = gc(ggalCI, C.chg);
+      const cc   = colorClass(chg);
+      document.getElementById('ggalci-price').textContent = fmt(last, 0);
+      document.getElementById('ggalci-price').className   = `price ${cc}`;
+      document.getElementById('ggalci-chg').textContent   = fmtPct(chg);
+      document.getElementById('ggalci-chg').className     = `change ${cc}`;
+      document.getElementById('ggalci-ba').innerHTML =
+        `<span class="b">B ${fmt(gc(ggalCI, C.bid), 0)}</span>&nbsp;/&nbsp;<span class="a">A ${fmt(gc(ggalCI, C.ask), 0)}</span>`;
+    }
+
+    // ── Tabla de opciones ─────────────────────────────────
+    const opts = dataRows
+      .filter(r => clean(r[C.symbol]).startsWith('GF'))
+      .sort((a, b) => parseNum(gc(a, C.strike)) - parseNum(gc(b, C.strike)));
+
+    if (!opts.length) {
+      document.getElementById('table-container').innerHTML =
+        '<div class="placeholder">Sin datos de opciones disponibles.</div>';
+      return;
+    }
+
+    let html = `
+    <table>
+      <thead>
+        <tr>
+          <th class="left">Símbolo</th>
+          <th>Strike</th>
+          <th>Bid</th>
+          <th>Bid VI</th>
+          <th>Ask</th>
+          <th>Ask VI</th>
+          <th>BdSz</th>
+          <th>AkSz</th>
+          <th>Último</th>
+          <th>Var %</th>
+          <th>Last VI</th>
+          <th>VE</th>
+          <th>Open</th>
+          <th>High</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+    for (const r of opts) {
+      const sym    = gc(r, C.symbol);
+      const strike = parseNum(gc(r, C.strike));
+      const chg    = gc(r, C.chg);
+      const last   = gc(r, C.last);
+      const cc     = colorClass(chg);
+
+      // Moneyness badge
+      let badge = '';
+      if (ggalLast && !isNaN(strike)) {
+        const diff = Math.abs(ggalLast - strike) / ggalLast;
+        if (diff < 0.015)           badge = '<span class="badge atm">ATM</span>';
+        else if (strike < ggalLast) badge = '<span class="badge itm">ITM</span>';
+        else                        badge = '<span class="badge otm">OTM</span>';
+      }
+
+      const isITM = ggalLast && !isNaN(strike) && strike < ggalLast;
+
+      html += `
+        <tr class="${isITM ? 'itm' : ''}">
+          <td class="sym">${sym}${badge}</td>
+          <td class="strike">${fmt(strike, 2)}</td>
+          <td class="bid-c">${fmt(gc(r, C.bid), 0)}</td>
+          <td class="vi">${gc(r, C.bidVI)  || '—'}</td>
+          <td class="ask-c">${fmt(gc(r, C.ask), 0)}</td>
+          <td class="vi">${gc(r, C.askVI)  || '—'}</td>
+          <td class="muted"><span class="chip">${gc(r, C.bidsize) || '—'}</span></td>
+          <td class="muted"><span class="chip">${gc(r, C.asksize) || '—'}</span></td>
+          <td class="${cc}">${fmt(last, 0)}</td>
+          <td class="${cc}">${fmtPct(chg)}</td>
+          <td class="vi">${gc(r, C.lastVI) || '—'}</td>
+          <td class="ve">${gc(r, C.lastVE) || '—'}</td>
+          <td class="muted">${fmt(gc(r, C.open), 0)}</td>
+          <td class="muted">${fmt(gc(r, C.high), 0)}</td>
+        </tr>`;
+    }
+
+    html += '</tbody></table>';
+    document.getElementById('table-container').innerHTML = html;
+  }
+
+  // ── Countdown ───────────────────────────────────────────
+  function resetCountdown() {
+    clearInterval(cdTimer);
+    cdVal = REFRESH_S;
+    document.getElementById('countdown').textContent = cdVal;
+    cdTimer = setInterval(() => {
+      cdVal--;
+      document.getElementById('countdown').textContent = cdVal;
+      if (cdVal <= 0) { clearInterval(cdTimer); fetchData(); }
+    }, 1000);
+  }
+
+  // ── Init ────────────────────────────────────────────────
+  fetchData();
+</script>
+</body>
+</html>
