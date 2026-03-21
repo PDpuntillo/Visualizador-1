@@ -86,10 +86,17 @@
     .chain-layout {
       display: flex;
       gap: 10px;
-      padding: 0 24px 80px;
+      padding: 0 24px;
       align-items: flex-start;
     }
-    .chain-panel { flex: 1; min-width: 0; overflow-x: auto; }
+    /* Cada panel es su propio contenedor de scroll (x e y)
+       para que position:sticky en th funcione correctamente */
+    .chain-panel {
+      flex: 1;
+      min-width: 0;
+      overflow: auto;
+      max-height: calc(100vh - 285px); /* viewport - header - cards - meta - statusbar */
+    }
     .panel-label {
       font-size: .68rem;
       font-weight: 700;
@@ -108,9 +115,6 @@
     thead tr {
       background: #161b22;
       border-bottom: 2px solid #30363d;
-      position: sticky;
-      top: 48px;
-      z-index: 5;
     }
     th {
       padding: 8px 10px;
@@ -121,9 +125,13 @@
       text-transform: uppercase;
       letter-spacing: .4px;
       white-space: nowrap;
-      position: relative;
+      position: sticky;
+      top: 0; /* relativo al chain-panel que es el scroll container */
+      z-index: 6;
+      background: #161b22;
       cursor: help;
       user-select: none;
+      box-shadow: 0 2px 0 #30363d;
     }
     th.left { text-align: left; }
 
