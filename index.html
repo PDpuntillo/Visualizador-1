@@ -116,6 +116,12 @@
     .chain-panel::-webkit-scrollbar-corner {
       background: #0d1117;
     }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
     .panel-label {
       font-size: .68rem;
       font-weight: 700;
@@ -124,10 +130,40 @@
       padding: 5px 10px;
       border-radius: 4px;
       display: inline-block;
-      margin-bottom: 8px;
     }
     .panel-label.calls { background: rgba(63,185,80,.15);  color: #3fb950; }
     .panel-label.puts  { background: rgba(248,81,73,.12);  color: #f85149; }
+
+    .filter-btn {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #8b949e;
+      padding: 3px 8px;
+      font-size: .82rem;
+      line-height: 1;
+      letter-spacing: 1px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .15s;
+    }
+    .filter-btn:hover { background: #21262d; color: #e6edf3; }
+    .filter-btn.open  { color: #58a6ff; border-color: #58a6ff; background: #0d1f3c; }
+
+    .filter-panel {
+      position: fixed;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 14px 16px;
+      min-width: 210px;
+      max-height: 62vh;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,.55);
+    }
+    .filter-panel.open { display: block; }
 
     /* ── Table ───────────────────────────────────────────── */
     table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: .81rem; }
@@ -235,6 +271,15 @@
       box-shadow: 0 8px 32px rgba(0,0,0,.55);
     }
     .gear-panel.open { display: block; }
+    /* Scrollbars para gear-panel y filter-panel */
+    .gear-panel::-webkit-scrollbar,
+    .filter-panel::-webkit-scrollbar { width: 8px; height: 8px; }
+    .gear-panel::-webkit-scrollbar-track,
+    .filter-panel::-webkit-scrollbar-track { background: #0d1117; }
+    .gear-panel::-webkit-scrollbar-thumb,
+    .filter-panel::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; border: 2px solid #0d1117; }
+    .gear-panel::-webkit-scrollbar-thumb:hover,
+    .filter-panel::-webkit-scrollbar-thumb:hover { background: #484f58; }
     .gear-title { font-size: .67rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #30363d; }
     .gear-all { display: flex; gap: 6px; margin-bottom: 10px; }
     .gear-all button {
@@ -326,15 +371,25 @@
 
   <!-- CALLS -->
   <div class="chain-panel">
-    <span class="panel-label calls">● Calls</span>
+    <div class="panel-header">
+      <span class="panel-label calls">● Calls</span>
+      <button class="filter-btn" id="filter-btn-calls" onclick="toggleFilter('calls')" title="Filtrar strikes">···</button>
+    </div>
     <div id="calls-container"><div class="placeholder">⏳ Cargando…</div></div>
   </div>
 
   <!-- PUTS -->
   <div class="chain-panel">
-    <span class="panel-label puts">● Puts</span>
+    <div class="panel-header">
+      <span class="panel-label puts">● Puts</span>
+      <button class="filter-btn" id="filter-btn-puts" onclick="toggleFilter('puts')" title="Filtrar strikes">···</button>
+    </div>
     <div id="puts-container"><div class="placeholder">⏳ Cargando…</div></div>
   </div>
+
+  <!-- Paneles de filtro (position:fixed, posicionados por JS) -->
+  <div class="filter-panel" id="filter-panel-calls"></div>
+  <div class="filter-panel" id="filter-panel-puts"></div>
 
   <!-- ⚙ GEAR -->
   <div class="gear-wrapper">
@@ -392,6 +447,7 @@
 
   let cdVal = REFRESH_S, cdTimer;
   let ggalLast = null, storedData = [];
+  const hiddenStrikes = { calls: new Set(), puts: new Set() };
 
   /* ── Helpers ───────────────────────────────────────── */
   const clean    = raw => String(raw ?? '').replace(/"/g, '').trim();
@@ -473,8 +529,12 @@
   /* ── Renderiza las dos tablas ──────────────────────── */
   function renderTables(dataRows) {
     const srt = arr => [...arr].sort((a,b)=>parseNum(gc(a,C.strike))-parseNum(gc(b,C.strike)));
-    document.getElementById('calls-container').innerHTML = buildTable(srt(dataRows.filter(r=>gc(r,C.symbol).startsWith('GFGC'))), 'call');
-    document.getElementById('puts-container').innerHTML  = buildTable(srt(dataRows.filter(r=>gc(r,C.symbol).startsWith('GFGV'))), 'put');
+    const callRows = srt(dataRows.filter(r=>gc(r,C.symbol).startsWith('GFGC')))
+                      .filter(r=>!hiddenStrikes.calls.has(gc(r,C.symbol)));
+    const putRows  = srt(dataRows.filter(r=>gc(r,C.symbol).startsWith('GFGV')))
+                      .filter(r=>!hiddenStrikes.puts.has(gc(r,C.symbol)));
+    document.getElementById('calls-container').innerHTML = buildTable(callRows, 'call');
+    document.getElementById('puts-container').innerHTML  = buildTable(putRows,  'put');
   }
 
   /* ── Render completo ───────────────────────────────── */
@@ -514,6 +574,67 @@
     renderTables(dataRows);
   }
 
+  /* ── Filter panel (por strikes) ────────────────────── */
+  function buildFilterPanel(side) {
+    const prefix = side === 'calls' ? 'GFGC' : 'GFGV';
+    const dataRows = storedData.filter(r => { const s=clean(r[C.symbol]); return s&&s!=='symbol'&&!/ltima/i.test(s); });
+    const rows = [...dataRows.filter(r=>gc(r,C.symbol).startsWith(prefix))]
+                  .sort((a,b)=>parseNum(gc(a,C.strike))-parseNum(gc(b,C.strike)));
+    const hidden = hiddenStrikes[side];
+    let html = `<div class="gear-title">Strikes visibles</div>
+      <div class="gear-all">
+        <button onclick="setAllStrikes('${side}',true)">Mostrar todo</button>
+        <button onclick="setAllStrikes('${side}',false)">Ocultar todo</button>
+      </div>`;
+    rows.forEach(row => {
+      const sym = gc(row,C.symbol);
+      const strike = fmt(gc(row,C.strike),2);
+      html += `<label class="gear-item">
+        <input type="checkbox" ${hidden.has(sym)?'':'checked'} onchange="toggleStrike('${side}','${sym}',this.checked)">
+        <span><span class="gear-col-name">${strike}</span>
+              <span class="gear-col-tip">${sym}</span></span>
+      </label>`;
+    });
+    document.getElementById(`filter-panel-${side}`).innerHTML = html;
+  }
+
+  function toggleFilter(side) {
+    const btn   = document.getElementById(`filter-btn-${side}`);
+    const panel = document.getElementById(`filter-panel-${side}`);
+    const open  = !panel.classList.contains('open');
+    // Cerrar el otro lado si está abierto
+    const other = side === 'calls' ? 'puts' : 'calls';
+    document.getElementById(`filter-panel-${other}`).classList.remove('open');
+    document.getElementById(`filter-btn-${other}`).classList.remove('open');
+    if (open) {
+      const r = btn.getBoundingClientRect();
+      panel.style.top       = (r.bottom + 6) + 'px';
+      panel.style.left      = r.left + 'px';
+      panel.style.maxHeight = (window.innerHeight - r.bottom - 16) + 'px';
+      buildFilterPanel(side);
+    }
+    panel.classList.toggle('open', open);
+    btn.classList.toggle('open', open);
+  }
+
+  function toggleStrike(side, sym, visible) {
+    if (visible) hiddenStrikes[side].delete(sym);
+    else         hiddenStrikes[side].add(sym);
+    refreshTables();
+  }
+
+  function setAllStrikes(side, visible) {
+    hiddenStrikes[side].clear();
+    if (!visible) {
+      const prefix = side === 'calls' ? 'GFGC' : 'GFGV';
+      storedData.filter(r=>{ const s=clean(r[C.symbol]); return s&&s!=='symbol'&&!/ltima/i.test(s); })
+                .filter(r=>gc(r,C.symbol).startsWith(prefix))
+                .forEach(r=>hiddenStrikes[side].add(gc(r,C.symbol)));
+    }
+    buildFilterPanel(side);
+    refreshTables();
+  }
+
   /* ── Gear panel ────────────────────────────────────── */
   function buildGearPanel() {
     let html = `<div class="gear-title">Columnas visibles</div>
@@ -537,8 +658,9 @@
     const open = !panel.classList.contains('open');
     if (open) {
       const r = btn.getBoundingClientRect();
-      panel.style.top   = (r.bottom + 6) + 'px';
-      panel.style.right = (window.innerWidth - r.right) + 'px';
+      panel.style.top       = (r.bottom + 6) + 'px';
+      panel.style.right     = (window.innerWidth - r.right) + 'px';
+      panel.style.maxHeight = (window.innerHeight - r.bottom - 16) + 'px';
       buildGearPanel();
     }
     panel.classList.toggle('open', open);
@@ -552,12 +674,22 @@
     renderTables(storedData.filter(r=>{ const s=clean(r[C.symbol]); return s&&s!=='symbol'&&!/ltima/i.test(s); }));
   }
 
-  // Cerrar panel al click afuera
+  // Cerrar paneles al click afuera
   document.addEventListener('click', e => {
+    // Gear
     if (!document.querySelector('.gear-wrapper').contains(e.target)) {
       document.getElementById('gear-panel').classList.remove('open');
       document.getElementById('gear-btn').classList.remove('open');
     }
+    // Filtros de strikes
+    ['calls','puts'].forEach(side => {
+      const btn   = document.getElementById(`filter-btn-${side}`);
+      const panel = document.getElementById(`filter-panel-${side}`);
+      if (!btn.contains(e.target) && !panel.contains(e.target)) {
+        panel.classList.remove('open');
+        btn.classList.remove('open');
+      }
+    });
   });
 
   // Posición dinámica del tooltip
