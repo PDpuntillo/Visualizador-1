@@ -97,6 +97,25 @@
       overflow: auto;
       max-height: calc(100vh - 285px); /* viewport - header - cards - meta - statusbar */
     }
+    /* Scrollbars personalizados — color del header de columnas */
+    .chain-panel::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    .chain-panel::-webkit-scrollbar-track {
+      background: #0d1117; /* fondo de la app */
+    }
+    .chain-panel::-webkit-scrollbar-thumb {
+      background: #30363d; /* borde del header */
+      border-radius: 4px;
+      border: 2px solid #0d1117;
+    }
+    .chain-panel::-webkit-scrollbar-thumb:hover {
+      background: #484f58;
+    }
+    .chain-panel::-webkit-scrollbar-corner {
+      background: #0d1117;
+    }
     .panel-label {
       font-size: .68rem;
       font-weight: 700;
